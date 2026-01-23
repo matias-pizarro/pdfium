@@ -496,7 +496,7 @@ TEST(RetainPtr, SetContains) {
   EXPECT_FALSE(pdfium::Contains(the_set, ptr2));
 #if !BUILDFLAG(IS_WIN) &&                                       \
     (defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
-     defined(UNDEFINED_SANITIZER))
+     defined(UNDEFINED_SANITIZER) || BUILDFLAG(IS_FREEBSD))
   constexpr int kExpectedObj2RetainCount = 4;
   constexpr int kExpectedObj2ReleaseCount = 2;
 #else
