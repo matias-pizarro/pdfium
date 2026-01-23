@@ -6,6 +6,8 @@
 
 #include "core/fxcrt/fx_memory.h"
 
+#include <string.h>
+
 #include "core/fxcrt/compiler_specific.h"
 #include "core/fxcrt/fx_safe_types.h"
 
@@ -58,11 +60,19 @@ void* Calloc(size_t num_members, size_t member_size) {
     return nullptr;
   }
 
-  return GetGeneralPartitionAllocator()
+  void* ptr = GetGeneralPartitionAllocator()
       .root()
       ->AllocInline<partition_alloc::AllocFlags::kReturnNull |
                     partition_alloc::AllocFlags::kZeroFill>(total.ValueOrDie(),
                                                             "GeneralPartition");
+#if BUILDFLAG(IS_FREEBSD)
+  // FreeBSD PartitionAlloc zero-fill appears unreliable for reuse cases.
+  // Ensure calloc semantics here.
+  if (ptr) {
+    memset(ptr, 0, total.ValueOrDie());
+  }
+#endif
+  return ptr;
 }
 
 void* Realloc(void* ptr, size_t num_members, size_t member_size) {
