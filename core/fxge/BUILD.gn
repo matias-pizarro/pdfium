@@ -166,7 +166,7 @@ source_set("fxge") {
     ]
   }
 
-  if (is_linux || is_chromeos) {
+  if (is_linux || is_chromeos || current_os == "freebsd") {
     sources += [ "linux/fx_linux_impl.cpp" ]
   }
 

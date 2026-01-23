@@ -11,6 +11,11 @@
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <sys/stat.h>
+#elif defined(__FreeBSD__)
+#include <limits.h>
+#include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
 #else  // Linux
 #include <linux/limits.h>
 #include <sys/stat.h>
@@ -25,6 +30,12 @@
 namespace {
 
 #if defined(__APPLE__) || (defined(ANDROID) && __ANDROID_API__ < 21)
+using stat_wrapper_t = struct stat;
+
+int CallStat(const char* path, stat_wrapper_t* sb) {
+  return stat(path, sb);
+}
+#elif defined(__FreeBSD__)
 using stat_wrapper_t = struct stat;
 
 int CallStat(const char* path, stat_wrapper_t* sb) {
@@ -86,6 +97,17 @@ std::string PathService::GetExecutableDir() {
   if (_NSGetExecutablePath(&path[0], &path_length)) {
     return std::string();
   }
+#elif defined(__FreeBSD__)
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+  char buf[PATH_MAX];
+  size_t buf_size = sizeof(buf);
+  if (sysctl(mib, 4, buf, &buf_size, nullptr, 0) != 0 || buf_size == 0) {
+    return std::string();
+  }
+  if (buf[buf_size - 1] == '\0') {
+    --buf_size;
+  }
+  path = std::string(buf, buf_size);
 #else   // Linux
   static const char kProcSelfExe[] = "/proc/self/exe";
   char buf[PATH_MAX];

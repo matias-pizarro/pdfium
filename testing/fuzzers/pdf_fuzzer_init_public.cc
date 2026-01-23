@@ -25,6 +25,10 @@
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
+#elif defined(__FreeBSD__)
+#include <limits.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
 #else  // Linux
 #include <linux/limits.h>
 #include <unistd.h>
@@ -55,6 +59,16 @@ std::string ProgramPath() {
     if (resolved_path.get()) {
       result = std::string(resolved_path.get());
     }
+  }
+#elif defined(__FreeBSD__)
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+  char path[PATH_MAX];
+  size_t len = sizeof(path);
+  if (sysctl(mib, 4, path, &len, nullptr, 0) == 0 && len > 0) {
+    if (path[len - 1] == '\0') {
+      --len;
+    }
+    result = std::string(path, len);
   }
 #else  // Linux
   char path[PATH_MAX];

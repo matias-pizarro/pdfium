@@ -19,7 +19,8 @@
 #include "core/fxge/fx_font.h"
 #include "core/fxge/systemfontinfo_iface.h"
 
-#if !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS) && !defined(OS_ASMJS)
+#if !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS) && \
+    !BUILDFLAG(IS_FREEBSD) && !defined(OS_ASMJS)
 #error "Included on the wrong platform"
 #endif
 
