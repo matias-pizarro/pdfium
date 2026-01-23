@@ -269,6 +269,52 @@ std::optional<WideString> TryVSWPrintf(size_t size,
     return std::nullopt;
   }
 
+  auto try_simple_format = [](const wchar_t* format,
+                              va_list args) -> std::optional<WideString> {
+    std::wstring out;
+    for (const wchar_t* p = format; *p; ++p) {
+      if (*p != L'%') {
+        out.push_back(*p);
+        continue;
+      }
+      ++p;
+      if (*p == L'%') {
+        out.push_back(L'%');
+        continue;
+      }
+      if (*p == L'#' || *p == L'-' || *p == L'+' || *p == L'0' ||
+          *p == L' ' || FXSYS_IsDecimalDigit(*p) || *p == L'*') {
+        return std::nullopt;
+      }
+      int precision = -1;
+      if (*p == L'.') {
+        ++p;
+        precision = 0;
+        while (FXSYS_IsDecimalDigit(*p)) {
+          precision = precision * 10 + (*p - L'0');
+          ++p;
+        }
+      }
+      if (*p == L'l') {
+        ++p;
+      }
+      if (*p != L's') {
+        return std::nullopt;
+      }
+      const wchar_t* arg = va_arg(args, const wchar_t*);
+      if (!arg) {
+        arg = L"";
+      }
+      size_t len = wcslen(arg);
+      if (precision >= 0 &&
+          static_cast<size_t>(precision) < len) {
+        len = static_cast<size_t>(precision);
+      }
+      out.append(arg, len);
+    }
+    return WideString(out.c_str(), out.size());
+  };
+
   WideString str;
   {
     // Span's lifetime must end before ReleaseBuffer() below.
@@ -282,7 +328,21 @@ std::optional<WideString> TryVSWPrintf(size_t size,
     // See https://crbug.com/705912.
     UNSAFE_BUFFERS(
         FXSYS_memset(buffer.data(), 0, (size + 1) * sizeof(wchar_t)));
-    int ret = UNSAFE_TODO(vswprintf(buffer.data(), size + 1, pFormat, argList));
+    va_list argListCopy;
+    va_copy(argListCopy, argList);
+    int ret =
+        UNSAFE_TODO(vswprintf(buffer.data(), size + 1, pFormat, argListCopy));
+    va_end(argListCopy);
+    if (ret < 0) {
+      va_list argListCopy2;
+      va_copy(argListCopy2, argList);
+      std::optional<WideString> fallback =
+          try_simple_format(pFormat, argListCopy2);
+      va_end(argListCopy2);
+      if (fallback.has_value()) {
+        return fallback;
+      }
+    }
     bool bSufficientBuffer = ret >= 0 || buffer[size - 1] == 0;
     if (!bSufficientBuffer) {
       return std::nullopt;
